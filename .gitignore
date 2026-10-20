@@ -1,0 +1,17 @@
+# Claude Code plugin-sync state, machine specific
+synced/
+
+# Third-party skills installed by other tools, not authored here
+find-skills
+
+# Python bytecode from the helper scripts
+__pycache__/
+*.pyc
+
+.DS_Store
+
+# Private, machine-specific skill: how to reach and run things on the home server
+home-server/
+
+# Claude Code plugin-sync leftovers (built-in skills moved aside), machine specific
+.trash/

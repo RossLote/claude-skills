@@ -1,0 +1,18 @@
+{
+  "type": "object",
+  "required": ["phase", "status", "summary"],
+  "properties": {
+    "phase": { "type": "string", "enum": ["setup", "bead", "merge", "integrate", "prove", "pr", "ci"] },
+    "status": { "type": "string", "enum": ["done", "noop", "blocked", "failed"] },
+    "summary": { "type": "string", "description": "What happened, two sentences at most" },
+    "question": { "type": "string", "description": "blocked only: the one question, recommendation first" },
+    "bead": { "type": "string" },
+    "branch": { "type": "string" },
+    "worktree": { "type": "string" },
+    "close_reason": { "type": "string", "description": "bead only: the fixed key=value close reason" },
+    "fix_beads": { "type": "array", "items": { "type": "string" }, "description": "integrate, prove, ci: open beads this call filed under the epic" },
+    "pr": { "type": "integer" },
+    "pr_url": { "type": "string" },
+    "ci": { "type": "string", "enum": ["green", "failed", "none"] }
+  }
+}

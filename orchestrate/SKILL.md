@@ -41,6 +41,10 @@ PROTOCOL, and per-bead acceptance, READ FIRST and TOUCHES. Build what they say.
   carrying it. A run that cannot show that is not finished, whatever else is green.
   The spec that records it is throwaway: never committed, so the PR's diff carries no
   walkthrough spec, fixture, helper, page object, package or workflow (user, 2026-10-13).
+- **A run that can open a pull request is complete when it has, never before** (user,
+  2026-10-27). RUN MODE may change where beads merge and which reviews run; it never drops
+  the final pull request, and no repo rule ends a run at a merge into a local branch
+  instead. A repo with no remote gets the pr skill's Artifact report and the branch name.
 - **The run ends with nothing for the user to do** except read the PR and merge it. No
   follow-up beads, no open questions, no list of things to consider. Worth doing means
   done in this run; not worth doing in this run means not worth a bead.
@@ -51,8 +55,8 @@ An epic whose notes open with a **RUN MODE** section is run the way that section
 Read it in setup before anything else. Each of its lines replaces the step of this skill
 it names: which branch a bead starts from, whether beads merge into an epic branch or each
 opens its own pull request, which end-of-epic steps run (simplify, plain review,
-adversarial review, walkthrough, run record, final PR), what proof a bead carries, and who
-merges. Everything RUN MODE does not mention runs exactly as written here: the per-bead
+adversarial review, walkthrough, run record; never the final pull request), what proof a
+bead carries, and who merges. Everything RUN MODE does not mention runs exactly as written here: the per-bead
 loop, the diff review, the close reasons, the three-worker cap, the worktree hygiene. A
 RUN MODE line is never a reason to stop and ask, and the fixed DONE MEANS lines are not
 appended to an epic whose RUN MODE replaces them. The headless driver

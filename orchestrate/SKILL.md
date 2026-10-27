@@ -6,8 +6,9 @@ model: claude-opus-5-5[1m]
 
 # Orchestrate one epic with worker agents
 
-You are the **orchestrator**. Workers write the code; you write their prompts, review
-every diff, commit, keep beads current, and produce the pull request. Workers never talk
+You are the **orchestrator**. Workers write the code; you write their prompts, run each
+bead's full gate, review every diff, commit, keep beads current, and produce the pull
+request. Workers never talk
 to the user. One epic per run; the user opens another terminal for a second epic.
 
 Workers are spawned by agent type, never by `model` and never as `general-purpose`:
@@ -94,11 +95,16 @@ that belongs to another epic is filed there in one line and not built here.
    env files and no generated client: run the repo's `make worktree-setup` in every worktree
    this run adds, when the Makefile has that target, and its `make worktree-teardown` before
    removing one: a gate's Docker project and dev servers otherwise outlive the worktree.
-3. Read the gates and standing rules from the repo's CLAUDE.md. The worker gate is the
-   fast tier (lint, unit tests, and the test files the bead touches). The full tier
+3. Read the gates and standing rules from the repo's CLAUDE.md. Two gates, two owners
+   (user, 2026-10-27): workers run the targeted form of the fast tier while they iterate
+   (the test files the bead touches, one project, package or spec file, and lint on the
+   files they changed where the linter takes paths); you run the full fast tier (lint,
+   typecheck, unit tests) once per bead, the moment the worker hands back, in the
+   background while the next bead starts (per-bead loop, step 4). A worker never runs the
+   full fast tier: it would hold its slot idle for the gate's whole run. The full tier
    (integration, e2e) runs at the end of the epic, not per bead. A bead that touches e2e
    specs runs only those spec files, with the repo's single-spec command and a port of its
-   own, never the whole e2e tier: workers run three at a time next to a merge gate, and the
+   own, never the whole e2e tier: workers run three at a time next to a gate, and the
    timed specs fail under that load. Say so in the prompt's gate line.
 
 ## Scheduling
@@ -115,12 +121,14 @@ that belongs to another epic is filed there in one line and not built here.
   branched, the two were never checked together: run the fast gate on the epic branch after
   the merge, and a failure goes to `merge-resolver` too. Then `make worktree-teardown` runs
   in the worktree when the Makefile has that target, and the worktree and branch are
-  removed. A bead that runs alone works in the epic worktree directly.
+  removed. A bead works in the epic worktree directly only while nothing else uses it: a
+  gate still running there, or a worker still in it, means the next bead gets a worktree
+  of its own.
 - **Batch** closely related ready beads for one worker: same pattern repeated, same
   files, follow-ups on one screen, and the same `MODEL:`. Never across an unmet dep. If
   a batch partially fails, split the remainder back into single beads.
-- **Two rounds, then a fresh worker**: a diff that fails review gets one specific
-  correction; if the second review still fails, spawn a fresh worker with the original
+- **Two rounds, then a fresh worker**: a diff that fails review or the gate gets one
+  specific correction; if the second review still fails, spawn a fresh worker with the original
   prompt plus what went wrong. The fresh worker is always `worker-opus`, whichever type
   ran first, so a Sonnet bead that fails twice escalates to Opus. Never a third round on
   the same worker.
@@ -129,46 +137,69 @@ that belongs to another epic is filed there in one line and not built here.
 
 1. **Claim**: `bd update <id> --claim`.
 2. **Prompt**: title and description; the epic's DECISIONS, marked as settled; worktree
-   path and branch; READ FIRST; TOUCHES with "do not edit outside these paths"; the fast
-   gate command. Then the finish line in one block:
+   path and branch; READ FIRST; TOUCHES with "do not edit outside these paths"; the
+   targeted test command (the test files the bead touches, one project, package or spec
+   file). Then the finish line in one block:
    ```
-   Done means: <each acceptance item>; the fast gate green; nothing edited outside
-   TOUCHES; nothing in your report marked as not confirmed.
+   Done means: <each acceptance item>; the targeted tests green; nothing edited outside
+   TOUCHES; nothing in your report marked as not confirmed. Never run the full fast
+   gate or the whole unit tier: the orchestrator runs it once you hand back, so hand
+   back as soon as the acceptance items are done and the targeted tests are green.
    Stop only if the bead, DECISIONS and the plan docs leave a question open and
    guessing would change the design. Otherwise keep going to the finish line.
    ```
    Then the standing rules: work only in the worktree, read the plan docs before coding,
-   grep for an existing helper before writing one, never commit or push; a gate failure in
-   a test the bead does not touch is run once on `<base>`, and when it fails there too it is
+   grep for an existing helper before writing one, never commit or push; a failure in a
+   test the bead does not touch is run once on `<base>`, and when it fails there too it is
    reported as pre-existing and the bead carries on, never chased further. The report, in
    this order: `Blocked on you:` (one question, or `nothing`); what was done; files
-   changed; gate output pasted verbatim; anything not confirmed and where the worker
-   looked; any mismatch between the bead and the code. Nothing else.
+   changed; the targeted tests' output pasted verbatim; anything not confirmed and where
+   the worker looked; any mismatch between the bead and the code. Nothing else.
 3. **Spawn** in the background with `subagent_type` `worker-sonnet` or `worker-opus`
    per the bead's `MODEL:` line; no line means `worker-opus`. The Agent `description`
    starts with the bead id (`acme-k3p1.3 invitation actions`): the cost script finds the
    run's agents by it. Wait for the completion notification. Never fabricate a result. A
    result that mentions a flagged message or a model switch is discarded: spawn a fresh
    worker of the same type with the same prompt and count it as a respawn.
-4. **Review the diff**, every bead, proportionate to its risk. Read the worker's
+4. **Gate** (user, 2026-10-27): the moment the worker hands back, start the full fast
+   gate in the bead's worktree as a background command writing to a log (`<fast gate>
+   > /tmp/gate-<bead-id>.log 2>&1`, through `boxgate` where the box has it), note the
+   time, and do not wait for it: claim and spawn the next ready bead (steps 1 to 3) and
+   read this diff (step 5) while it runs. The gate's run is the only use of that
+   worktree until it ends: nothing is edited there and no correction goes to the worker
+   while it runs. Never end your turn with a gate running and nothing being waited on;
+   when no worker is in flight, wait on the gate in the foreground (`tail --pid=<pid> -f
+   /dev/null` with a long timeout, repeated until it ends). When it ends, read the tail
+   of its log, never the whole output. Green: on to step 5's verdict and step 6. Red in a
+   test or file the bead touches: send the failing lines to the same worker with
+   SendMessage as its round-2 correction (its context is intact; a fresh agent is the
+   wrong tool), wait for it, run the gate again; a second red is the two-rounds rule's
+   fresh worker. Red in a test the bead does not touch: run that test once on `<base>`;
+   red there too is pre-existing and step 5 says how it is filed; green there means the
+   bead broke it, and that is round 2. The gate's own run time is the close reason's
+   `gate=`.
+5. **Review the diff**, every bead, proportionate to its risk. Read the worker's
    `Blocked on you` line first. Four questions:
    - **Correct**: every acceptance item, nothing beyond. An item the worker marked as not
      confirmed is a failed item. Spot-check one test for behaviour rather than coverage.
    - **Fits**: consistent with landed beads, the plan docs and CLAUDE.md's standing
      rules. Re-inventing something or quietly changing scope fails.
-   - **Honest**: read the worker's gate output; re-run the fast gate only when the
-     report is unclear. Look for skipped tests, `eslint-disable`, `as any`.
+   - **Honest**: read the worker's targeted-test output and, once it ends, the gate log;
+     re-run a test only when the report is unclear. Look for skipped tests,
+     `eslint-disable`, `as any`.
    - **No loose ends**: anything found is fixed in the push-back, folded into a later
      bead's prompt, or dropped. Never deferred to the user.
-   A gate failure the worker found red on `<base>` too is not this bead's: review the rest
-   as usual, and the first time it is reported, file one fix bead for it under the epic,
+   A failure red on `<base>` too, found by the worker or by your gate, is not this bead's:
+   review the rest as usual, and the first time it is reported, file one fix bead for it
+   under the epic,
    priority 1 so the scheduler starts it next, unless a bead under the epic already names
    that test; name the bead in the close reason's `mismatch`. Every later worker meets the
    same failure, and in one run four workers each spent minutes proving one pre-existing
    before a fifth filed it.
-   Push back via SendMessage with a specific correction and append the same sentence to
-   the bead as `ROUND 2: <correction>`; re-review; count the round.
-5. **Commit** in the bead's worktree, subject naming the bead id. **Close** with one
+   Push back via SendMessage with a specific correction, once the gate has ended, and
+   append the same sentence to the bead as `ROUND 2: <correction>`; a correction that
+   changes code means the gate runs again (step 4); re-review; count the round.
+6. **Commit** in the bead's worktree, subject naming the bead id. **Close** with one
    fixed reason, the same keys on every bead so runs compare:
    ```
    bd close <id> --reason "worker=opus rounds=1 respawn=0 minutes=22 gate=5m round2=none mismatch=none unconfirmed=none"

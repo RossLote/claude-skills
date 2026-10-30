@@ -23,8 +23,9 @@ definitions they spawn. Installed on a machine, this directory *is*
 
 `/brief` works out what a feature is in rounds of questions and keeps the record
 on one bead. `/epic` turns the settled design into a beads epic. `/epic-review`
-lints it before it runs. `/orchestrate` runs it unattended with worker agents and
-ends with `/adversarial-review` and `/pr`. `/address-review` handles the review
+lints it before it runs. `/epic-and-review` runs those two in subagents, one after
+the other, when the user starts it by hand after a brief. `/orchestrate` runs it
+unattended with worker agents and ends with `/adversarial-review` and `/pr`. `/address-review` handles the review
 threads until merge. `/retro` reads the run records back and proposes changes to
 the skills. `/handover` and `/takeover` move a running orchestration between
 sessions; `/handoff` is the copy-paste version.

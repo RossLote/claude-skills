@@ -335,6 +335,8 @@ if [ ! -d "$EPIC_WT" ]; then
     slug=$(printf '%s' "${title%%: *}" | sed -E 's/\[(EPIC|epic)\]//; s/[^A-Za-z0-9]+/-/g; s/^-|-$//g' | tr A-Z a-z)
     [ ${#slug} -gt 40 ] && { slug=${slug:0:41}; slug=${slug%-*}; }   # cut at a word boundary
     git -C "$CLONE" worktree add -q "$EPIC_WT" -b "$EPIC/${slug:-epic}" "origin/$BASE"; log "created $EPIC_WT on $EPIC/${slug:-epic} from origin/$BASE"
+    # Pushed at once so a stacked epic can be queued with this branch as its --base (2026-11-09).
+    git -C "$EPIC_WT" push -q -u origin "$EPIC/${slug:-epic}" || log "could not push $EPIC/${slug:-epic} yet; a stacked epic cannot use it as a base until it is pushed"
   fi
   prepare_wt "$EPIC_WT"
 fi

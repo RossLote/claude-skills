@@ -94,7 +94,12 @@ that belongs to another epic is filed there in one line and not built here.
    names none. Epic worktree and branch off `<base>`, never the main checkout:
    ```
    git worktree add ../<repo>-<epic-id> -b <epic-id>/<slug> <base>
+   git -C ../<repo>-<epic-id> push -u origin <epic-id>/<slug>
    ```
+   Push the new branch at once, before any bead runs, when the repo has a remote: a stacked
+   epic is queued with this branch as its `--base`, and the queue refuses a base that is not
+   on origin, so a branch first pushed when the PR opens leaves the next epic unqueueable for
+   the whole run (Ross, 2026-11-09). Later pushes add to it as usual.
    Every git command runs with `-C <worktree>`. A fresh worktree has none of the gitignored
    env files and no generated client: run the repo's `make worktree-setup` in every worktree
    this run adds, when the Makefile has that target, and its `make worktree-teardown` before
